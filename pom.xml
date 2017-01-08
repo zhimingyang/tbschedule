@@ -11,7 +11,19 @@
       <groupId>commons-lang</groupId>  
       <artifactId>commons-lang</artifactId>  
       <version>2.4</version> 
-    </dependency>  
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api -->
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <version>3.0.1</version>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/tomcat/jasper-runtime -->
+    <dependency>
+      <groupId>tomcat</groupId>
+      <artifactId>jasper-runtime</artifactId>
+      <version>5.5.23</version>
+    </dependency>
     <dependency> 
       <groupId>commons-beanutils</groupId>  
       <artifactId>commons-beanutils-core</artifactId>  
@@ -120,7 +132,7 @@
           <connectors>
             <connector implementation="org.eclipse.jetty.server.nio.SelectChannelConnector">
               <host>localhost</host>
-              <port>80</port>
+              <port>8888</port>
               <maxIdleTime>60000</maxIdleTime>
             </connector>
           </connectors>

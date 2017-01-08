@@ -61,7 +61,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	
 	private Map<String,List<IStrategyTask>> managerMap = new ConcurrentHashMap<String, List<IStrategyTask>>();
 	
-	private ApplicationContext			applicationcontext;	
+	private ApplicationContext	applicationcontext; //Spring的context
 	private String uuid;
 	private String ip;
 	private String hostName;
@@ -92,7 +92,12 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 		}
 		this.init(p);
 	}
-	
+
+	/**
+	 * 初始化
+	 * @param p
+	 * @throws Exception
+	 */
 	public void init(Properties p) throws Exception {
 	    if(this.initialThread != null){
 	    	this.initialThread.stopThread();
@@ -101,6 +106,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 		try{
 			this.scheduleDataManager = null;
 			this.scheduleStrategyManager = null;
+
 		    ConsoleManager.setScheduleManagerFactory(this);
 		    if(this.zkManager != null){
 				this.zkManager.close();
@@ -120,8 +126,11 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
      * @throws Exception
      */
 	public void initialData() throws Exception{
+			//初始化zk上的数据
 			this.zkManager.initial();
+			//任务相关的DataManager
 			this.scheduleDataManager = new ScheduleDataManager4ZK(this.zkManager);
+			//策略相关的DataManager
 			this.scheduleStrategyManager  = new ScheduleStrategyDataManager4ZK(this.zkManager);
 			if (this.start == true) {
 				// 注册调度管理器
@@ -163,7 +172,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 		}
 		return result;
 	}
-
+	//Timmer定期去调度执行
 	public void refresh() throws Exception {
 		this.lock.lock();
 		try {
@@ -460,6 +469,9 @@ class ManagerFactoryTimerTask extends java.util.TimerTask {
 	}
 }
 
+/**
+ *	初始化的线程
+ */
 class InitialThread extends Thread{
 	private static transient Logger log = LoggerFactory.getLogger(InitialThread.class);
 	TBScheduleManagerFactory facotry;
@@ -470,11 +482,14 @@ class InitialThread extends Thread{
 	public void stopThread(){
 		this.isStop = true;
 	}
+
 	@Override
 	public void run() {
+		//执行初始化
 		facotry.lock.lock();
 		try {
 			int count =0;
+			//如果初始化失败
 			while(facotry.zkManager.checkZookeeperState() == false){
 				count = count + 1;
 				if(count % 50 == 0){
@@ -486,6 +501,7 @@ class InitialThread extends Thread{
 					return;
 				}
 			}
+			//初始化数据
 			facotry.initialData();
 		} catch (Throwable e) {
 			 log.error(e.getMessage(),e);
