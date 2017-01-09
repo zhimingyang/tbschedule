@@ -128,9 +128,10 @@ public class ScheduleStrategyDataManager4ZK{
 		}
 		
 		List<String> result = new ArrayList<String>();
+		//获取所有的调度策略
 		for(ScheduleStrategy scheduleStrategy:loadAllScheduleStrategy()){
 			boolean isFind = false;
-			//暂停或者不在IP范围
+			//找出暂停状态或者是，同时ip和当前factory一致的策略
 			if(ScheduleStrategy.STS_PAUSE.equalsIgnoreCase(scheduleStrategy.getSts()) == false &&  scheduleStrategy.getIPList() != null){
 				for(String ip:scheduleStrategy.getIPList()){
 					if(ip.equals("127.0.0.1") || ip.equalsIgnoreCase("localhost") || ip.equals(managerFactory.getIp())|| ip.equalsIgnoreCase(managerFactory.getHostName())){
@@ -144,6 +145,7 @@ public class ScheduleStrategyDataManager4ZK{
 					}
 				}
 			}
+			//删除掉暂停的策略
 			if(isFind == false){//清除原来注册的Factory
 				String zkPath =	this.PATH_Strategy+"/"+ scheduleStrategy.getStrategyName()+ "/"+ managerFactory.getUuid();
 				if(this.getZooKeeper().exists(zkPath, false)!=null){

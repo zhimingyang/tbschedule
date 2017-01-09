@@ -34,18 +34,20 @@ import com.taobao.pamirs.schedule.zk.ZKManager;
 public class TBScheduleManagerFactory implements ApplicationContextAware {
 
 	protected static transient Logger logger = LoggerFactory.getLogger(TBScheduleManagerFactory.class);
-	
+	//Zk的配置
 	private Map<String,String> zkConfig;
-	
+
+	//Zookeeper的管理中心
 	protected ZKManager zkManager;
-
-
 
 	/**
 	 * 是否启动调度管理，如果只是做系统管理，应该设置为false
 	 */
+
 	public boolean start = true;
+
 	private int timerInterval = 2000;
+
 	/**
 	 * ManagerFactoryTimerTask上次执行的时间戳。<br/>
 	 * zk环境不稳定，可能导致所有task自循环丢失，调度停止。<br/>
@@ -56,21 +58,29 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	/**
 	 * 调度配置中心客服端
 	 */
-	private IScheduleDataManager	scheduleDataManager;
+	//任务信息管理器
+	private IScheduleDataManager scheduleDataManager;
+	//策略信息管理器
 	private ScheduleStrategyDataManager4ZK scheduleStrategyManager;
-	
+	//TBScheduleManager的Task集合
 	private Map<String,List<IStrategyTask>> managerMap = new ConcurrentHashMap<String, List<IStrategyTask>>();
-	
+	//Spring的ApplicationContext
 	private ApplicationContext	applicationcontext; //Spring的context
+	//UUID用于标识机器
 	private String uuid;
+	//本机IP
 	private String ip;
+	//本机HOST
 	private String hostName;
-
+	//定时刷新线程
 	private Timer timer;
+	//ManagerFactoryTimerTask的Task
 	private ManagerFactoryTimerTask timerTask;
+
 	protected Lock  lock = new ReentrantLock();
     
 	volatile String  errorMessage ="No config Zookeeper connect infomation";
+	//初始化线程
 	private InitialThread initialThread;
 	
 	public TBScheduleManagerFactory() {
@@ -99,11 +109,15 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	 * @throws Exception
 	 */
 	public void init(Properties p) throws Exception {
+
 	    if(this.initialThread != null){
+			//重新初始化，需要停掉之前的线程
 	    	this.initialThread.stopThread();
 	    }
+
 		this.lock.lock();
 		try{
+
 			this.scheduleDataManager = null;
 			this.scheduleStrategyManager = null;
 
@@ -111,8 +125,10 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 		    if(this.zkManager != null){
 				this.zkManager.close();
 			}
+			//初始化ZKManager,主要做连接zk
 			this.zkManager = new ZKManager(p);
 			this.errorMessage = "Zookeeper connecting ......" + this.zkManager.getConnectStr();
+			//初始化Init线程
 			initialThread = new InitialThread(this);
 			initialThread.setName("TBScheduleManagerFactory-initialThread");
 			initialThread.start();
@@ -146,9 +162,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	}
 
 	/**
-	 * 创建调度服务器
-	 * @param baseTaskType
-	 * @param ownSign
+	 * 创建相关的IStrategyTask，并且执行
 	 * @return
 	 * @throws Exception
 	 */
@@ -180,6 +194,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 			ManagerFactoryInfo stsInfo = null;
 			boolean isException = false;
 			try {
+				//load相关的factory信息
 				stsInfo = this.getScheduleStrategyManager().loadManagerFactoryInfo(this.getUuid());
 			} catch (Exception e) {
 				isException = true;
@@ -197,6 +212,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 				this.getScheduleStrategyManager().unRregisterManagerFactory(
 						this);
 			} else {
+				//重新注册ManagerFactory
 				reRegisterManagerFactory();
 			}
 		} finally {
@@ -204,8 +220,9 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 		}
 	}
 	public void reRegisterManagerFactory() throws Exception{
-		//重新分配调度器
+		//获取需要停掉的Strategy
 		List<String> stopList = this.getScheduleStrategyManager().registerManagerFactory(this);
+		//遍历需要停止的策略名称
 		for (String strategyName : stopList) {
 			this.stopServer(strategyName);
 		}
@@ -217,14 +234,18 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	 * @throws Exception
 	 */
 	public void assignScheduleServer() throws Exception{
+		//获取当前正在运行的factory实例相对于的factory实例(zookeeper上的)
 		for(ScheduleStrategyRunntime run: this.scheduleStrategyManager.loadAllScheduleStrategyRunntimeByUUID(this.uuid)){
+			//获取当前策略下的所有的执行节点
 			List<ScheduleStrategyRunntime> factoryList = this.scheduleStrategyManager.loadAllScheduleStrategyRunntimeByTaskType(run.getStrategyName());
+			//选主，这里应该算是一个分布式锁，由主节点进行重新分配
 			if(factoryList.size() == 0 || this.isLeader(this.uuid, factoryList) ==false){
 				continue;
 			}
 			ScheduleStrategy scheduleStrategy =this.scheduleStrategyManager.loadStrategy(run.getStrategyName());
 			
 			int[] nums =  ScheduleUtil.assignTaskNumber(factoryList.size(), scheduleStrategy.getAssignNum(), scheduleStrategy.getNumOfSingleServer());
+
 			for(int i=0;i<factoryList.size();i++){
 				ScheduleStrategyRunntime factory = 	factoryList.get(i);
 				//更新请求的服务器数量
@@ -248,15 +269,21 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 			logger.error("判断Leader出错：uuif="+uuid, e);
 			return true;
 		}
-	}	
-	
+	}
+
+	/**
+	 * 重新运行ScheduleStrategyRunntime,这个ScheduleStrategyRunntime是经过重新分配的
+	 * @throws Exception
+	 */
 	public void reRunScheduleServer() throws Exception{
 		for (ScheduleStrategyRunntime run : this.scheduleStrategyManager.loadAllScheduleStrategyRunntimeByUUID(this.uuid)) {
 			List<IStrategyTask> list = this.managerMap.get(run.getStrategyName());
+			//如果为空，那么新建
 			if(list == null){
 				list = new ArrayList<IStrategyTask>();
 				this.managerMap.put(run.getStrategyName(),list);
 			}
+			//如果当前的ScheduleStrategyRunntime的Task个数大于list内的，那么就减小哦啊哦数量
 			while(list.size() > run.getRequestNum() && list.size() >0){
 				IStrategyTask task  =  list.remove(list.size() - 1);
 					try {
@@ -265,7 +292,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 						logger.error("注销任务错误：strategyName=" + run.getStrategyName(), e);
 					}
 				}
-		   //不足，增加调度器
+		   //不足，那么增加Task
 		   ScheduleStrategy strategy = this.scheduleStrategyManager.loadStrategy(run.getStrategyName());
 		   while(list.size() < run.getRequestNum()){
 			   IStrategyTask result = this.createStrategyTask(strategy);
@@ -284,6 +311,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 	 * @throws Exception
 	 */
 	public void stopServer(String strategyName) throws Exception {
+		//终止所有任务
 		if(strategyName == null){
 			String[] nameList = (String[])this.managerMap.keySet().toArray(new String[0]);
 			for (String name : nameList) {
@@ -297,6 +325,7 @@ public class TBScheduleManagerFactory implements ApplicationContextAware {
 				this.managerMap.remove(name);
 			}
 		}else {
+			//终止strategyName对应的一类任务
 			List<IStrategyTask> list = this.managerMap.get(strategyName);
 			if(list != null){
 				for(IStrategyTask task:list){
@@ -489,8 +518,9 @@ class InitialThread extends Thread{
 		facotry.lock.lock();
 		try {
 			int count =0;
-			//如果初始化失败
+			//不断检测当前Zookeepr的状态
 			while(facotry.zkManager.checkZookeeperState() == false){
+				//失败
 				count = count + 1;
 				if(count % 50 == 0){
 					facotry.errorMessage = "Zookeeper connecting ......" + facotry.zkManager.getConnectStr() + " spendTime:" + count * 20 +"(ms)";

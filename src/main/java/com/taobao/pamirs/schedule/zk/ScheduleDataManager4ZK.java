@@ -63,6 +63,7 @@ public class ScheduleDataManager4ZK implements IScheduleDataManager {
         String tempPath = this.zkManager.getZooKeeper().create(this.zkManager.getRootPath() + "/systime",null, this.zkManager.getAcl(), CreateMode.EPHEMERAL_SEQUENTIAL);
         Stat tempStat = this.zkManager.getZooKeeper().exists(tempPath, false);
         zkBaseTime = tempStat.getCtime();
+        //时间差的检测
         ZKTools.deleteTree(getZooKeeper(), tempPath);
         if(Math.abs(this.zkBaseTime - this.loclaBaseTime) > 5000){
         	log.error("请注意，Zookeeper服务器时间与本地时间相差 ： " + Math.abs(this.zkBaseTime - this.loclaBaseTime) +" ms");

@@ -4,7 +4,6 @@ import com.taobao.pamirs.schedule.strategy.TBScheduleManagerFactory;
 import org.apache.log4j.PropertyConfigurator;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
-
 import java.util.Hashtable;
 import java.util.Properties;
 

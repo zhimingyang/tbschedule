@@ -50,6 +50,7 @@ public class ZKManager{
 	}
 	
 	private void connect() throws Exception {
+		//CountDownLatch做超时处理
 		CountDownLatch connectionLatch = new CountDownLatch(1);
 		createZookeeper(connectionLatch);
 		connectionLatch.await(10,TimeUnit.SECONDS);
